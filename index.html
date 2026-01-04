@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Flappy Bird HTML</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body{
+  margin:0;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+  background:#70c5ce;
+  font-family:sans-serif;
+  user-select:none;
+}
+
+#game{
+  position:relative;
+  width:320px;
+  height:480px;
+  background:#4ec0ca;
+  overflow:hidden;
+  border-radius:10px;
+}
+
+#bird{
+  position:absolute;
+  width:34px;
+  height:24px;
+  background:yellow;
+  border-radius:50%;
+  left:60px;
+  top:200px;
+}
+
+.pipe{
+  position:absolute;
+  width:52px;
+  background:#2ecc71;
+}
+
+.pipe.top{
+  top:0;
+}
+
+.pipe.bottom{
+  bottom:0;
+}
+
+#score{
+  position:absolute;
+  top:10px;
+  left:50%;
+  transform:translateX(-50%);
+  font-size:32px;
+  color:white;
+  font-weight:bold;
+  text-shadow:2px 2px 4px rgba(0,0,0,.4);
+}
+</style>
+</head>
+
+<body>
+
+<div id="game">
+  <div id="score">0</div>
+  <div id="bird"></div>
+</div>
+
+<script>
+const game = document.getElementById("game");
+const bird = document.getElementById("bird");
+const scoreEl = document.getElementById("score");
+
+let birdY = 200;
+let velocity = 0;
+let gravity = 0.5;
+let score = 0;
+let gameOver = false;
+
+// Nhảy
+function jump(){
+  velocity = -7;
+}
+
+document.addEventListener("click", jump);
+document.addEventListener("keydown", e=>{
+  if(e.code === "Space") jump();
+});
+
+// Tạo ống
+function createPipe(){
+  if(gameOver) return;
+
+  const gap = 120;
+  const topHeight = Math.random() * 200 + 50;
+  const bottomHeight = 480 - gap - topHeight;
+
+  const pipeTop = document.createElement("div");
+  pipeTop.className = "pipe top";
+  pipeTop.style.height = topHeight + "px";
+  pipeTop.style.left = "320px";
+
+  const pipeBottom = document.createElement("div");
+  pipeBottom.className = "pipe bottom";
+  pipeBottom.style.height = bottomHeight + "px";
+  pipeBottom.style.left = "320px";
+
+  game.appendChild(pipeTop);
+  game.appendChild(pipeBottom);
+
+  let x = 320;
+  let passed = false;
+
+  const move = setInterval(()=>{
+    if(gameOver){
+      clearInterval(move);
+      return;
+    }
+
+    x -= 2;
+    pipeTop.style.left = x + "px";
+    pipeBottom.style.left = x + "px";
+
+    if(x < 60 && !passed){
+      score++;
+      scoreEl.innerText = score;
+      passed = true;
+    }
+
+    if(checkCollision(pipeTop) || checkCollision(pipeBottom)){
+      endGame();
+    }
+
+    if(x < -60){
+      pipeTop.remove();
+      pipeBottom.remove();
+      clearInterval(move);
+    }
+  },20);
+}
+
+// Kiểm tra va chạm
+function checkCollision(pipe){
+  const birdRect = bird.getBoundingClientRect();
+  const pipeRect = pipe.getBoundingClientRect();
+
+  return !(
+    birdRect.right < pipeRect.left ||
+    birdRect.left > pipeRect.right ||
+    birdRect.bottom < pipeRect.top ||
+    birdRect.top > pipeRect.bottom
+  );
+}
+
+// Game over
+function endGame(){
+  gameOver = true;
+  alert("Game Over! Score: " + score);
+  location.reload();
+}
+
+// Vòng lặp game
+function gameLoop(){
+  if(gameOver) return;
+
+  velocity += gravity;
+  birdY += velocity;
+
+  if(birdY < 0) birdY = 0;
+  if(birdY > 456){
+    endGame();
+  }
+
+  bird.style.top = birdY + "px";
+  requestAnimationFrame(gameLoop);
+}
+
+setInterval(createPipe, 1500);
+gameLoop();
+</script>
+
+</body>
+</html>
