@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Flappy Bird By Pham Minh Nhat</title>
+<title>Flappy Bird</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -14,6 +14,7 @@ html,body{
   background:#000;
   user-select:none;
   touch-action:manipulation;
+  font-family:sans-serif;
 }
 
 #game{
@@ -41,15 +42,8 @@ html,body{
   width:52px;
   background:url("pipe.png") repeat-y center/contain;
 }
-
-.pipe.top{
-  transform:rotate(180deg);
-  top:0;
-}
-
-.pipe.bottom{
-  bottom:12vh;
-}
+.pipe.top{ transform:rotate(180deg); top:0; }
+.pipe.bottom{ bottom:12vh; }
 
 /* Đất */
 #ground{
@@ -67,11 +61,39 @@ html,body{
   top:16px;
   left:50%;
   transform:translateX(-50%);
-  font-size:36px;
-  color:white;
+  font-size:32px;
+  color:#fff;
   font-weight:bold;
   text-shadow:2px 2px 4px #000;
   z-index:10;
+}
+
+/* Game Over */
+#overlay{
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,.6);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:20;
+}
+
+#panel{
+  background:#fff;
+  padding:20px 30px;
+  border-radius:12px;
+  text-align:center;
+}
+
+#panel h1{ margin:0 0 10px; }
+#panel button{
+  margin-top:10px;
+  padding:10px 20px;
+  font-size:16px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
 }
 </style>
 </head>
@@ -79,129 +101,148 @@ html,body{
 <body>
 
 <div id="game">
-  <div id="score">0</div>
+  <div id="score"></div>
   <div id="bird"></div>
   <div id="ground"></div>
+
+  <div id="overlay">
+    <div id="panel">
+      <h1>Game Over</h1>
+      <p id="finalScore"></p>
+      <button onclick="restart()">Restart</button>
+    </div>
+  </div>
 </div>
 
 <script>
-const game = document.getElementById("game");
 const bird = document.getElementById("bird");
 const ground = document.getElementById("ground");
 const scoreEl = document.getElementById("score");
+const overlay = document.getElementById("overlay");
+const finalScore = document.getElementById("finalScore");
 
-let birdY = window.innerHeight * 0.4;
-let velocity = 0;
-let gravity = 0.45;
-let score = 0;
-let gameOver = false;
-let groundX = 0;
+let birdY, velocity, score, best;
+let gameOver, groundX;
+let pipeSpeed, gapSize;
+let pipes = [];
+let pipeTimer;
 
-// Nhảy
+function init(){
+  birdY = innerHeight * 0.4;
+  velocity = 0;
+  score = 0;
+  best = localStorage.getItem("bestScore") || 0;
+  gameOver = false;
+  groundX = 0;
+  pipeSpeed = 3;
+  gapSize = 0.28;
+
+  pipes.forEach(p=>p.remove());
+  pipes = [];
+
+  overlay.style.display = "none";
+  scoreEl.innerText = `0 | Best: ${best}`;
+}
+
 function jump(){
   if(gameOver) return;
   velocity = -8;
 }
 
-document.addEventListener("click", jump);
-document.addEventListener("touchstart", jump);
-document.addEventListener("keydown", e=>{
-  if(e.code === "Space") jump();
+addEventListener("click", jump);
+addEventListener("touchstart", jump);
+addEventListener("keydown", e=>{
+  if(e.code==="Space") jump();
 });
 
-// Tạo ống (TO BẰNG NHAU)
 function createPipe(){
-  if(gameOver) return;
-
-  const gap = window.innerHeight * 0.25;
+  const gap = innerHeight * gapSize;
   const groundH = ground.offsetHeight;
 
-  // 🔥 chỉ random vị trí gap
-  const offset = Math.random() * (window.innerHeight - gap - groundH - 100) + 50;
+  const offset = Math.random() *
+    (innerHeight - gap - groundH - 120) + 60;
 
-  const pipeTop = document.createElement("div");
-  pipeTop.className = "pipe top";
-  pipeTop.style.height = offset + "px";
-  pipeTop.style.left = window.innerWidth + "px";
-
-  const pipeBottom = document.createElement("div");
-  pipeBottom.className = "pipe bottom";
-  pipeBottom.style.height =
-    window.innerHeight - offset - gap - groundH + "px";
-  pipeBottom.style.left = window.innerWidth + "px";
-
-  game.appendChild(pipeTop);
-  game.appendChild(pipeBottom);
-
-  let x = window.innerWidth;
-  let passed = false;
-
-  const move = setInterval(()=>{
-    if(gameOver){
-      clearInterval(move);
-      return;
-    }
-
-    x -= 3;
-    pipeTop.style.left = x + "px";
-    pipeBottom.style.left = x + "px";
-
-    if(x < bird.offsetLeft && !passed){
-      score++;
-      scoreEl.innerText = score;
-      passed = true;
-    }
-
-    if(hit(pipeTop) || hit(pipeBottom)){
-      endGame();
-    }
-
-    if(x < -120){
-      pipeTop.remove();
-      pipeBottom.remove();
-      clearInterval(move);
-    }
-  },16);
+  ["top","bottom"].forEach(type=>{
+    const p = document.createElement("div");
+    p.className = "pipe " + type;
+    p.style.height =
+      type==="top" ? offset+"px" :
+      (innerHeight-offset-gap-groundH)+"px";
+    p.style.left = innerWidth + "px";
+    game.appendChild(p);
+    pipes.push(p);
+  });
 }
 
-// Va chạm
+function updatePipes(){
+  pipes.forEach((p,i)=>{
+    let x = (parseFloat(p.style.left)||0) - pipeSpeed;
+    p.style.left = x + "px";
+
+    if(i%2===0 && x < bird.offsetLeft && !p.passed){
+      p.passed = true;
+      score++;
+
+      if(score%5===0){
+        pipeSpeed += 0.3;
+        gapSize = Math.max(0.18, gapSize - 0.015);
+      }
+      scoreEl.innerText = `${score} | Best: ${best}`;
+    }
+
+    if(hit(p)) endGame();
+    if(x < -120){ p.remove(); pipes.shift(); }
+  });
+}
+
 function hit(pipe){
   const b = bird.getBoundingClientRect();
   const p = pipe.getBoundingClientRect();
-
-  return !(b.right<p.left || b.left>p.right || b.bottom<p.top || b.top>p.bottom);
+  return !(b.right<p.left||b.left>p.right||b.bottom<p.top||b.top>p.bottom);
 }
 
-// Game over
 function endGame(){
+  if(gameOver) return;
   gameOver = true;
-  setTimeout(()=>{
-    alert("Game Over! Score: " + score);
-    location.reload();
-  },100);
+  clearInterval(pipeTimer);
+
+  if(score > best){
+    best = score;
+    localStorage.setItem("bestScore", best);
+  }
+
+  finalScore.innerText = `Score: ${score}\nBest: ${best}`;
+  overlay.style.display = "flex";
 }
 
-// Loop
+function restart(){
+  init();
+  pipeTimer = setInterval(createPipe, 1500);
+  loop();
+}
+
 function loop(){
   if(gameOver) return;
 
-  velocity += gravity;
+  velocity += 0.45;
   birdY += velocity;
 
   if(birdY < 0) birdY = 0;
-  if(birdY + bird.offsetHeight > window.innerHeight - ground.offsetHeight){
-    endGame();
+  if(birdY + bird.offsetHeight > innerHeight - ground.offsetHeight){
+    endGame(); return;
   }
 
   bird.style.top = birdY + "px";
 
-  groundX -= 3;
+  groundX -= pipeSpeed;
   ground.style.backgroundPositionX = groundX + "px";
 
+  updatePipes();
   requestAnimationFrame(loop);
 }
 
-setInterval(createPipe,1500);
+init();
+pipeTimer = setInterval(createPipe,1500);
 loop();
 </script>
 
