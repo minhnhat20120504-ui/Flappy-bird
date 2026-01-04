@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Flappy Bird</title>
+<title>Flappy Bird By PMN</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -17,45 +17,53 @@ html,body{
   font-family:sans-serif;
 }
 
+/* ===== GAME ===== */
 #game{
   position:relative;
   width:100vw;
   height:100vh;
   overflow:hidden;
   background:url("bg.png") repeat-x;
-  background-size:cover;
+  background-size:auto 100%; /* SCALE CHUẨN */
 }
 
-/* Chim */
+/* ===== BIRD ===== */
 #bird{
   position:absolute;
-  width:34px;
-  height:24px;
-  background:url("bird.png") no-repeat center/contain;
+  width:34px;      /* CHUẨN GỐC */
+  height:24px;     /* CHUẨN GỐC */
   left:15vw;
   top:40vh;
+  background:url("bird.png") no-repeat;
+  background-size:100% 100%;
 }
 
-/* Ống */
+/* ===== PIPE ===== */
 .pipe{
   position:absolute;
-  width:52px;
-  background:url("pipe.png") repeat-y center/contain;
+  width:52px; /* CHUẨN GỐC */
+  background:url("pipe.png") repeat-y;
+  background-size:52px auto;
 }
-.pipe.top{ transform:rotate(180deg); top:0; }
-.pipe.bottom{ bottom:12vh; }
+.pipe.top{
+  top:0;
+  transform:rotate(180deg);
+}
+.pipe.bottom{
+  bottom:112px; /* ĐÚNG BẰNG ĐẤT */
+}
 
-/* Đất */
+/* ===== GROUND ===== */
 #ground{
   position:absolute;
   bottom:0;
   width:200%;
-  height:12vh;
+  height:112px; /* CHUẨN GỐC */
   background:url("ground.png") repeat-x;
-  background-size:auto 100%;
+  background-size:auto 112px;
 }
 
-/* Điểm */
+/* ===== SCORE ===== */
 #score{
   position:absolute;
   top:16px;
@@ -68,7 +76,7 @@ html,body{
   z-index:10;
 }
 
-/* Game Over */
+/* ===== GAME OVER ===== */
 #overlay{
   position:absolute;
   inset:0;
@@ -78,15 +86,12 @@ html,body{
   justify-content:center;
   z-index:20;
 }
-
 #panel{
   background:#fff;
   padding:20px 30px;
   border-radius:12px;
   text-align:center;
 }
-
-#panel h1{ margin:0 0 10px; }
 #panel button{
   margin-top:10px;
   padding:10px 20px;
@@ -107,9 +112,9 @@ html,body{
 
   <div id="overlay">
     <div id="panel">
-      <h1>Game Over</h1>
+      <h2>SAO NON VẬY KKK</h2>
       <p id="finalScore"></p>
-      <button onclick="restart()">Restart</button>
+      <button onclick="restart()">Chơi Lại</button>
     </div>
   </div>
 </div>
@@ -122,9 +127,9 @@ const overlay = document.getElementById("overlay");
 const finalScore = document.getElementById("finalScore");
 
 let birdY, velocity, score, best;
-let gameOver, groundX;
-let pipeSpeed, gapSize;
+let pipeSpeed, gapRatio, groundX;
 let pipes = [];
+let gameOver = false;
 let pipeTimer;
 
 function init(){
@@ -132,16 +137,16 @@ function init(){
   velocity = 0;
   score = 0;
   best = localStorage.getItem("bestScore") || 0;
-  gameOver = false;
-  groundX = 0;
   pipeSpeed = 3;
-  gapSize = 0.28;
+  gapRatio = 0.28;
+  groundX = 0;
+  gameOver = false;
 
   pipes.forEach(p=>p.remove());
   pipes = [];
 
-  overlay.style.display = "none";
   scoreEl.innerText = `0 | Best: ${best}`;
+  overlay.style.display = "none";
 }
 
 function jump(){
@@ -156,18 +161,18 @@ addEventListener("keydown", e=>{
 });
 
 function createPipe(){
-  const gap = innerHeight * gapSize;
-  const groundH = ground.offsetHeight;
+  const gap = innerHeight * gapRatio;
+  const groundH = 112;
 
-  const offset = Math.random() *
-    (innerHeight - gap - groundH - 120) + 60;
+  const topH = Math.random() *
+    (innerHeight - gap - groundH - 140) + 70;
 
   ["top","bottom"].forEach(type=>{
     const p = document.createElement("div");
     p.className = "pipe " + type;
     p.style.height =
-      type==="top" ? offset+"px" :
-      (innerHeight-offset-gap-groundH)+"px";
+      type==="top" ? topH+"px" :
+      (innerHeight - topH - gap - groundH)+"px";
     p.style.left = innerWidth + "px";
     game.appendChild(p);
     pipes.push(p);
@@ -183,19 +188,20 @@ function updatePipes(){
       p.passed = true;
       score++;
 
-      if(score%5===0){
+      if(score % 5 === 0){
         pipeSpeed += 0.3;
-        gapSize = Math.max(0.18, gapSize - 0.015);
+        gapRatio = Math.max(0.18, gapRatio - 0.015);
       }
+
       scoreEl.innerText = `${score} | Best: ${best}`;
     }
 
-    if(hit(p)) endGame();
-    if(x < -120){ p.remove(); pipes.shift(); }
+    if(checkHit(p)) endGame();
+    if(x < -80){ p.remove(); pipes.shift(); }
   });
 }
 
-function hit(pipe){
+function checkHit(pipe){
   const b = bird.getBoundingClientRect();
   const p = pipe.getBoundingClientRect();
   return !(b.right<p.left||b.left>p.right||b.bottom<p.top||b.top>p.bottom);
@@ -217,7 +223,7 @@ function endGame(){
 
 function restart(){
   init();
-  pipeTimer = setInterval(createPipe, 1500);
+  pipeTimer = setInterval(createPipe,1500);
   loop();
 }
 
@@ -228,7 +234,7 @@ function loop(){
   birdY += velocity;
 
   if(birdY < 0) birdY = 0;
-  if(birdY + bird.offsetHeight > innerHeight - ground.offsetHeight){
+  if(birdY + 24 > innerHeight - 112){
     endGame(); return;
   }
 
