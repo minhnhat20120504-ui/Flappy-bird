@@ -2,82 +2,101 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
 <title>Flappy Bird</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{
+html,body{
+  margin:0;
+  width:100%;
+  height:100%;
   overflow:hidden;
   background:#000;
+  user-select:none;
   touch-action:manipulation;
-  font-family:Arial,Helvetica,sans-serif;
+  font-family:sans-serif;
 }
 
 #game{
   position:relative;
   width:100vw;
   height:100vh;
-  background:url(bg.png) repeat-x;
+  overflow:hidden;
+  background:url("bg.png") repeat-x;
   background-size:auto 100%;
 }
 
+/* Flash đỏ khi va chạm */
+#game.hit{
+  animation:flash .15s linear 2;
+}
+@keyframes flash{
+  0%{filter:none}
+  50%{filter:brightness(1.6) sepia(1) hue-rotate(-20deg)}
+  100%{filter:none}
+}
+
+/* Chim */
 #bird{
   position:absolute;
   width:34px;
   height:24px;
-  background:url(bird.png) no-repeat center/contain;
-  left:25%;
-  top:40%;
-  z-index:5;
-}
-
-.pipe{
-  position:absolute;
-  width:52px;
+  left:15vw;
+  top:40vh;
+  background:url("bird.png") no-repeat;
   background-size:100% 100%;
 }
 
-.pipe.top{
-  top:0;
-  background-image:url(pipe-top.png);
+/* Chim rung khi chết */
+#bird.dead{
+  animation:shake .4s;
+}
+@keyframes shake{
+  0%{transform:translate(0)}
+  25%{transform:translate(-3px,2px)}
+  50%{transform:translate(3px,-2px)}
+  75%{transform:translate(-2px,2px)}
+  100%{transform:translate(0)}
 }
 
-.pipe.bottom{
-  bottom:112px;
-  background-image:url(pipe-bottom.png);
+/* Ống */
+.pipe{
+  position:absolute;
+  width:52px;
+  background:url("pipe.png") repeat-y;
+  background-size:52px auto;
 }
+.pipe.top{ top:0; transform:rotate(180deg); }
+.pipe.bottom{ bottom:112px; }
 
+/* Đất */
 #ground{
   position:absolute;
   bottom:0;
   width:200%;
   height:112px;
-  background:url(ground.png) repeat-x;
+  background:url("ground.png") repeat-x;
   background-size:auto 112px;
-  animation:groundMove 1.5s linear infinite;
 }
 
-@keyframes groundMove{
-  from{transform:translateX(0)}
-  to{transform:translateX(-50%)}
-}
-
+/* Điểm */
 #score{
   position:absolute;
-  top:20px;
-  width:100%;
-  text-align:center;
-  font-size:26px;
+  top:16px;
+  left:50%;
+  transform:translateX(-50%);
+  font-size:32px;
   color:#fff;
-  text-shadow:2px 2px 0 #000;
+  font-weight:bold;
+  text-shadow:2px 2px 4px #000;
   z-index:10;
 }
 
+/* Overlay */
 #overlay{
   position:absolute;
   inset:0;
-  background:rgba(0,0,0,.65);
+  background:rgba(0,0,0,.6);
   display:flex;
   align-items:center;
   justify-content:center;
@@ -90,14 +109,7 @@ body{
   border-radius:14px;
   text-align:center;
 }
-
-#panel h2{
-  font-size:22px;
-  margin-bottom:10px;
-}
-
 #panel button{
-  margin-top:12px;
   padding:10px 26px;
   font-size:16px;
   border:none;
@@ -105,39 +117,21 @@ body{
   background:#ffcc00;
   cursor:pointer;
 }
-
-.flash{
-  animation:flash .15s;
-}
-@keyframes flash{
-  0%{background:red}
-  100%{background:transparent}
-}
-
-.shake{
-  animation:shake .3s;
-}
-@keyframes shake{
-  0%{transform:translateX(0)}
-  25%{transform:translateX(-6px)}
-  50%{transform:translateX(6px)}
-  75%{transform:translateX(-6px)}
-  100%{transform:translateX(0)}
-}
 </style>
 </head>
 
 <body>
+
 <div id="game">
-  <div id="score">0</div>
+  <div id="score"></div>
   <div id="bird"></div>
   <div id="ground"></div>
 
   <div id="overlay">
     <div id="panel">
-      <h2>SAO NON VẬY KKK</h2>
+      <h2 id="title">Flappy Bird</h2>
       <p id="finalScore"></p>
-      <button onclick="startGame()">START</button>
+      <button id="actionBtn">START</button>
     </div>
   </div>
 </div>
@@ -145,80 +139,80 @@ body{
 <script>
 const game = document.getElementById("game");
 const bird = document.getElementById("bird");
-const overlay = document.getElementById("overlay");
+const ground = document.getElementById("ground");
 const scoreEl = document.getElementById("score");
+const overlay = document.getElementById("overlay");
 const finalScore = document.getElementById("finalScore");
+const title = document.getElementById("title");
+const actionBtn = document.getElementById("actionBtn");
 
-let y, vy, gravity = 0.5;
+let birdY, velocity, score, best;
+let pipeSpeed, gapRatio, groundX;
 let pipes = [];
-let pipeSpeed = 2.6;
-let gapRatio = 0.26;
-let score = 0;
-let best = localStorage.getItem("bestScore") || 0;
 let started = false;
 let gameOver = false;
 let pipeTimer;
 
-const bgMusic = new Audio("music.mp3");
-bgMusic.loop = true;
-bgMusic.volume = 0.4;
-
 function init(){
-  y = innerHeight * 0.4;
-  vy = 0;
+  birdY = innerHeight * 0.4;
+  velocity = 0;
+  score = 0;
+  best = localStorage.getItem("bestScore") || 0;
+  pipeSpeed = 3;
+  gapRatio = 0.28;
+  groundX = 0;
+
   pipes.forEach(p=>p.remove());
   pipes = [];
-  score = 0;
-  pipeSpeed = 2.6;
-  gapRatio = 0.26;
+
+  started = false;
   gameOver = false;
-  scoreEl.innerText = score;
-  overlay.style.display = "none";
+  bird.classList.remove("dead");
+  game.classList.remove("hit");
+
+  scoreEl.innerText = `0 | Best: ${best}`;
+  title.innerText = "Flappy Bird";
+  finalScore.innerText = "";
+  actionBtn.innerText = "START";
+  overlay.style.display = "flex";
 }
 
 function startGame(){
-  if(started) return;
   started = true;
-  init();
-
-  bgMusic.currentTime = 0;
-  bgMusic.play();
-
+  overlay.style.display = "none";
   pipeTimer = setInterval(createPipe,1500);
   loop();
 }
 
-function loop(){
-  if(gameOver) return;
-
-  vy += gravity;
-  y += vy;
-  bird.style.top = y + "px";
-  bird.style.transform = `rotate(${vy*3}deg)`;
-
-  if(y < 0 || y > innerHeight - 136){
-    hitEffect();
-    endGame();
-  }
-
-  updatePipes();
-  requestAnimationFrame(loop);
-}
-
-function flap(){
+function jump(){
   if(!started || gameOver) return;
-  vy = -8;
+  velocity = -8;
 }
+
+addEventListener("click", jump);
+addEventListener("touchstart", jump);
+addEventListener("keydown", e=>{
+  if(e.code==="Space") jump();
+});
+
+actionBtn.onclick = ()=>{
+  if(!started) startGame();
+  else restart();
+};
 
 function createPipe(){
   const gap = innerHeight * gapRatio;
   const topH = Math.random() *
     (innerHeight - gap - 112 - 140) + 70;
 
+  const pipeId = Date.now(); // ID cho cặp ống
+
   ["top","bottom"].forEach(type=>{
     const p = document.createElement("div");
     p.className = "pipe " + type;
+    p.dataset.pipeId = pipeId;
     p.scored = false;
+
     p.style.height =
       type==="top" ? topH+"px" :
       (innerHeight - topH - gap - 112)+"px";
@@ -233,6 +227,7 @@ function updatePipes(){
     let x = (parseFloat(p.style.left)||0) - pipeSpeed;
     p.style.left = x + "px";
 
+    /* +1 ĐIỂM DUY NHẤT KHI QUA ỐNG TRÊN */
     if(
       p.classList.contains("top") &&
       !p.scored &&
@@ -240,58 +235,74 @@ function updatePipes(){
     ){
       p.scored = true;
       score++;
-      scoreEl.innerText = score;
 
       if(score % 5 === 0){
         pipeSpeed += 0.3;
         gapRatio = Math.max(0.18, gapRatio - 0.015);
       }
+      scoreEl.innerText = `${score} | Best: ${best}`;
     }
 
-    if(hit(p)){
-      hitEffect();
-      endGame();
-    }
+    if(hit(p)) endGame();
 
     if(x < -80){
       p.remove();
-      pipes = pipes.filter(o=>o!==p);
+      pipes = pipes.filter(pipe => pipe !== p);
     }
   });
 }
 
-function hit(p){
+function hit(pipe){
   const b = bird.getBoundingClientRect();
-  const r = p.getBoundingClientRect();
-  return !(b.right<r.left || b.left>r.right || b.bottom<r.top || b.top>r.bottom);
-}
-
-function hitEffect(){
-  game.classList.add("flash");
-  bird.classList.add("shake");
-  setTimeout(()=>{
-    game.classList.remove("flash");
-    bird.classList.remove("shake");
-  },300);
+  const p = pipe.getBoundingClientRect();
+  return !(b.right<p.left||b.left>p.right||b.bottom<p.top||b.top>p.bottom);
 }
 
 function endGame(){
   if(gameOver) return;
   gameOver = true;
   clearInterval(pipeTimer);
-  bgMusic.pause();
+
+  game.classList.add("hit");
+  bird.classList.add("dead");
 
   if(score > best){
     best = score;
     localStorage.setItem("bestScore", best);
   }
 
+  title.innerText = "SAO NON VẬY KKK";
   finalScore.innerText = `Score: ${score}\nBest: ${best}`;
+  actionBtn.innerText = "Chơi Lại";
   overlay.style.display = "flex";
 }
 
-addEventListener("mousedown",flap);
-addEventListener("touchstart",e=>{e.preventDefault();flap()},{passive:false});
+function restart(){
+  init();
+}
+
+function loop(){
+  if(gameOver) return;
+
+  velocity += 0.45;
+  birdY += velocity;
+
+  if(birdY < 0) birdY = 0;
+  if(birdY + 24 > innerHeight - 112){
+    endGame(); return;
+  }
+
+  bird.style.top = birdY + "px";
+
+  groundX -= pipeSpeed;
+  ground.style.backgroundPositionX = groundX + "px";
+
+  updatePipes();
+  requestAnimationFrame(loop);
+}
+
+init();
 </script>
+
 </body>
 </html>
