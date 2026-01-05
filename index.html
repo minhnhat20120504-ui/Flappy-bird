@@ -137,6 +137,9 @@ html,body{
 </div>
 
 <script>
+  const bgMusic = new Audio("music.mp3");
+bgMusic.loop = true;
+bgMusic.volume = 0.4;
 const game = document.getElementById("game");
 const bird = document.getElementById("bird");
 const ground = document.getElementById("ground");
@@ -180,9 +183,14 @@ function init(){
 function startGame(){
   started = true;
   overlay.style.display = "none";
+
+  bgMusic.currentTime = 0; // reset
+  bgMusic.play();         // 🔊 PHÁT NHẠC
+
   pipeTimer = setInterval(createPipe,1500);
   loop();
 }
+
 
 function jump(){
   if(!started || gameOver) return;
@@ -262,7 +270,7 @@ function endGame(){
   if(gameOver) return;
   gameOver = true;
   clearInterval(pipeTimer);
-
+bgMusic.pause();
   game.classList.add("hit");
   bird.classList.add("dead");
 
