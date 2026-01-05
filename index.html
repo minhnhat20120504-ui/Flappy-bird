@@ -26,7 +26,7 @@ html,body{
   background-size:auto 100%;
 }
 
-/* ===== FLASH HIT ===== */
+/* Flash đỏ khi va chạm */
 #game.hit{
   animation:flash .15s linear 2;
 }
@@ -36,7 +36,7 @@ html,body{
   100%{filter:none}
 }
 
-/* ===== BIRD ===== */
+/* Chim */
 #bird{
   position:absolute;
   width:34px;
@@ -45,7 +45,6 @@ html,body{
   top:40vh;
   background:url("bird.png") no-repeat;
   background-size:100% 100%;
-  transition:transform .1s;
 }
 
 /* Chim rung khi chết */
@@ -60,7 +59,7 @@ html,body{
   100%{transform:translate(0)}
 }
 
-/* ===== PIPE ===== */
+/* Ống */
 .pipe{
   position:absolute;
   width:52px;
@@ -70,7 +69,7 @@ html,body{
 .pipe.top{ top:0; transform:rotate(180deg); }
 .pipe.bottom{ bottom:112px; }
 
-/* ===== GROUND ===== */
+/* Đất */
 #ground{
   position:absolute;
   bottom:0;
@@ -80,7 +79,7 @@ html,body{
   background-size:auto 112px;
 }
 
-/* ===== SCORE ===== */
+/* Điểm */
 #score{
   position:absolute;
   top:16px;
@@ -93,7 +92,7 @@ html,body{
   z-index:10;
 }
 
-/* ===== OVERLAY ===== */
+/* Overlay */
 #overlay{
   position:absolute;
   inset:0;
@@ -110,17 +109,6 @@ html,body{
   border-radius:14px;
   text-align:center;
 }
-
-#panel h2{
-  margin:0 0 10px;
-  font-size:22px;
-}
-
-#panel p{
-  margin:6px 0 12px;
-  font-size:16px;
-}
-
 #panel button{
   padding:10px 26px;
   font-size:16px;
@@ -173,12 +161,15 @@ function init(){
   pipeSpeed = 3;
   gapRatio = 0.28;
   groundX = 0;
+
   pipes.forEach(p=>p.remove());
   pipes = [];
+
   started = false;
   gameOver = false;
-
   bird.classList.remove("dead");
+  game.classList.remove("hit");
+
   scoreEl.innerText = `0 | Best: ${best}`;
   title.innerText = "Flappy Bird";
   finalScore.innerText = "";
@@ -214,9 +205,14 @@ function createPipe(){
   const topH = Math.random() *
     (innerHeight - gap - 112 - 140) + 70;
 
+  const pipeId = Date.now(); // ID cho cặp ống
+
   ["top","bottom"].forEach(type=>{
     const p = document.createElement("div");
     p.className = "pipe " + type;
+    p.dataset.pipeId = pipeId;
+    p.scored = false;
+
     p.style.height =
       type==="top" ? topH+"px" :
       (innerHeight - topH - gap - 112)+"px";
@@ -227,13 +223,19 @@ function createPipe(){
 }
 
 function updatePipes(){
-  pipes.forEach((p,i)=>{
+  pipes.forEach(p=>{
     let x = (parseFloat(p.style.left)||0) - pipeSpeed;
     p.style.left = x + "px";
 
-    if(i%2===0 && x < bird.offsetLeft && !p.passed){
-      p.passed = true;
+    /* +1 ĐIỂM DUY NHẤT KHI QUA ỐNG TRÊN */
+    if(
+      p.classList.contains("top") &&
+      !p.scored &&
+      x + 52 < bird.offsetLeft
+    ){
+      p.scored = true;
       score++;
+
       if(score % 5 === 0){
         pipeSpeed += 0.3;
         gapRatio = Math.max(0.18, gapRatio - 0.015);
@@ -242,7 +244,11 @@ function updatePipes(){
     }
 
     if(hit(p)) endGame();
-    if(x < -80){ p.remove(); pipes.shift(); }
+
+    if(x < -80){
+      p.remove();
+      pipes = pipes.filter(pipe => pipe !== p);
+    }
   });
 }
 
@@ -259,8 +265,6 @@ function endGame(){
 
   game.classList.add("hit");
   bird.classList.add("dead");
-
-  setTimeout(()=>game.classList.remove("hit"),300);
 
   if(score > best){
     best = score;
