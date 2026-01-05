@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Flappy Bird By PMN</title>
+<title>Flappy Bird</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -16,61 +16,66 @@ html,body{
   touch-action:manipulation;
   font-family:sans-serif;
 }
-<div id="game">
-  <div id="score"></div>
-  <div id="bird"></div>
-  <div id="ground"></div>
 
-  <div id="overlay">
-    <div id="panel">
-      <h2 id="title">Flappy Bird</h2>
-      <p id="finalScore"></p>
-      <button id="actionBtn">START</button>
-    </div>
-  </div>
-</div>
-/* ===== GAME ===== */
 #game{
   position:relative;
   width:100vw;
   height:100vh;
   overflow:hidden;
   background:url("bg.png") repeat-x;
-  background-size:auto 100%; /* SCALE CHUẨN */
+  background-size:auto 100%;
+}
+
+/* ===== FLASH HIT ===== */
+#game.hit{
+  animation:flash .15s linear 2;
+}
+@keyframes flash{
+  0%{filter:none}
+  50%{filter:brightness(1.6) sepia(1) hue-rotate(-20deg)}
+  100%{filter:none}
 }
 
 /* ===== BIRD ===== */
 #bird{
   position:absolute;
-  width:34px;      /* CHUẨN GỐC */
-  height:24px;     /* CHUẨN GỐC */
+  width:34px;
+  height:24px;
   left:15vw;
   top:40vh;
   background:url("bird.png") no-repeat;
   background-size:100% 100%;
+  transition:transform .1s;
+}
+
+/* Chim rung khi chết */
+#bird.dead{
+  animation:shake .4s;
+}
+@keyframes shake{
+  0%{transform:translate(0)}
+  25%{transform:translate(-3px,2px)}
+  50%{transform:translate(3px,-2px)}
+  75%{transform:translate(-2px,2px)}
+  100%{transform:translate(0)}
 }
 
 /* ===== PIPE ===== */
 .pipe{
   position:absolute;
-  width:52px; /* CHUẨN GỐC */
+  width:52px;
   background:url("pipe.png") repeat-y;
   background-size:52px auto;
 }
-.pipe.top{
-  top:0;
-  transform:rotate(180deg);
-}
-.pipe.bottom{
-  bottom:112px; /* ĐÚNG BẰNG ĐẤT */
-}
+.pipe.top{ top:0; transform:rotate(180deg); }
+.pipe.bottom{ bottom:112px; }
 
 /* ===== GROUND ===== */
 #ground{
   position:absolute;
   bottom:0;
   width:200%;
-  height:112px; /* CHUẨN GỐC */
+  height:112px;
   background:url("ground.png") repeat-x;
   background-size:auto 112px;
 }
@@ -88,28 +93,40 @@ html,body{
   z-index:10;
 }
 
-/* ===== GAME OVER ===== */
+/* ===== OVERLAY ===== */
 #overlay{
   position:absolute;
   inset:0;
   background:rgba(0,0,0,.6);
-  display:none;
+  display:flex;
   align-items:center;
   justify-content:center;
   z-index:20;
 }
+
 #panel{
   background:#fff;
-  padding:20px 30px;
-  border-radius:12px;
+  padding:22px 30px;
+  border-radius:14px;
   text-align:center;
 }
+
+#panel h2{
+  margin:0 0 10px;
+  font-size:22px;
+}
+
+#panel p{
+  margin:6px 0 12px;
+  font-size:16px;
+}
+
 #panel button{
-  margin-top:10px;
-  padding:10px 20px;
+  padding:10px 26px;
   font-size:16px;
   border:none;
   border-radius:8px;
+  background:#ffcc00;
   cursor:pointer;
 }
 </style>
@@ -124,23 +141,27 @@ html,body{
 
   <div id="overlay">
     <div id="panel">
-      <h2>SAO NON VẬY KKK</h2>
+      <h2 id="title">Flappy Bird</h2>
       <p id="finalScore"></p>
-      <button onclick="restart()">Chơi Lại</button>
+      <button id="actionBtn">START</button>
     </div>
   </div>
 </div>
 
 <script>
+const game = document.getElementById("game");
 const bird = document.getElementById("bird");
 const ground = document.getElementById("ground");
 const scoreEl = document.getElementById("score");
 const overlay = document.getElementById("overlay");
 const finalScore = document.getElementById("finalScore");
+const title = document.getElementById("title");
+const actionBtn = document.getElementById("actionBtn");
 
 let birdY, velocity, score, best;
 let pipeSpeed, gapRatio, groundX;
 let pipes = [];
+let started = false;
 let gameOver = false;
 let pipeTimer;
 
@@ -152,17 +173,28 @@ function init(){
   pipeSpeed = 3;
   gapRatio = 0.28;
   groundX = 0;
-  gameOver = false;
-
   pipes.forEach(p=>p.remove());
   pipes = [];
+  started = false;
+  gameOver = false;
 
+  bird.classList.remove("dead");
   scoreEl.innerText = `0 | Best: ${best}`;
+  title.innerText = "Flappy Bird";
+  finalScore.innerText = "";
+  actionBtn.innerText = "START";
+  overlay.style.display = "flex";
+}
+
+function startGame(){
+  started = true;
   overlay.style.display = "none";
+  pipeTimer = setInterval(createPipe,1500);
+  loop();
 }
 
 function jump(){
-  if(gameOver) return;
+  if(!started || gameOver) return;
   velocity = -8;
 }
 
@@ -172,19 +204,22 @@ addEventListener("keydown", e=>{
   if(e.code==="Space") jump();
 });
 
+actionBtn.onclick = ()=>{
+  if(!started) startGame();
+  else restart();
+};
+
 function createPipe(){
   const gap = innerHeight * gapRatio;
-  const groundH = 112;
-
   const topH = Math.random() *
-    (innerHeight - gap - groundH - 140) + 70;
+    (innerHeight - gap - 112 - 140) + 70;
 
   ["top","bottom"].forEach(type=>{
     const p = document.createElement("div");
     p.className = "pipe " + type;
     p.style.height =
       type==="top" ? topH+"px" :
-      (innerHeight - topH - gap - groundH)+"px";
+      (innerHeight - topH - gap - 112)+"px";
     p.style.left = innerWidth + "px";
     game.appendChild(p);
     pipes.push(p);
@@ -199,21 +234,19 @@ function updatePipes(){
     if(i%2===0 && x < bird.offsetLeft && !p.passed){
       p.passed = true;
       score++;
-
       if(score % 5 === 0){
         pipeSpeed += 0.3;
         gapRatio = Math.max(0.18, gapRatio - 0.015);
       }
-
       scoreEl.innerText = `${score} | Best: ${best}`;
     }
 
-    if(checkHit(p)) endGame();
+    if(hit(p)) endGame();
     if(x < -80){ p.remove(); pipes.shift(); }
   });
 }
 
-function checkHit(pipe){
+function hit(pipe){
   const b = bird.getBoundingClientRect();
   const p = pipe.getBoundingClientRect();
   return !(b.right<p.left||b.left>p.right||b.bottom<p.top||b.top>p.bottom);
@@ -224,19 +257,24 @@ function endGame(){
   gameOver = true;
   clearInterval(pipeTimer);
 
+  game.classList.add("hit");
+  bird.classList.add("dead");
+
+  setTimeout(()=>game.classList.remove("hit"),300);
+
   if(score > best){
     best = score;
     localStorage.setItem("bestScore", best);
   }
 
+  title.innerText = "SAO NON VẬY KKK";
   finalScore.innerText = `Score: ${score}\nBest: ${best}`;
+  actionBtn.innerText = "Chơi Lại";
   overlay.style.display = "flex";
 }
 
 function restart(){
   init();
-  pipeTimer = setInterval(createPipe,1500);
-  loop();
 }
 
 function loop(){
@@ -260,8 +298,6 @@ function loop(){
 }
 
 init();
-pipeTimer = setInterval(createPipe,1500);
-loop();
 </script>
 
 </body>
